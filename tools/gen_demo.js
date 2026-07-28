@@ -7,7 +7,7 @@ const OWX = require('../js/owx.js');
 
 // générateur pseudo-aléatoire déterministe (pack de démo stable)
 let seed = 42;
-function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+function rnd() { seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
 function pick(probs) { let r = rnd(), acc = 0; for (let i = 0; i < probs.length; i++) { acc += probs[i]; if (r < acc) return i; } return probs.length - 1; }
 
 const N = 4000;

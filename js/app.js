@@ -61,6 +61,7 @@
     document.title = 'Croiseur OW — ' + (h.title || packName);
     if (h.defaults) { if (h.defaults.maskThreshold != null) state.opts.mask = h.defaults.maskThreshold; if (h.defaults.levels) state.opts.levels = h.defaults.levels.slice(); }
     $('inpMask').value = state.opts.mask;
+    { const lv = state.opts.levels.join(','); if ([...$('selLevels').options].some(op => op.value === lv)) $('selLevels').value = lv; }
     state.rows = []; state.cols = []; state.filters = []; state.months = null;
     const preset = (h.presets || [])[0];
     if (preset) state.months = preset.months.slice();
@@ -86,7 +87,7 @@
 
   async function tryCache() {
     const c = await cacheLoad();
-    if (!c) return false;
+    if (!c || pack) return false; // ne pas écraser une base déjà chargée à la main
     try {
       await loadPackFromBytes(c.bytes, c.name, true);
       $('cacheMsg').textContent = 'Base « ' + (pack.header.title || c.name) + ' » restaurée depuis le cache local du navigateur (enregistrée le ' + new Date(c.savedAt).toLocaleDateString('fr-FR') + ').';
@@ -109,8 +110,13 @@
       const ok = id => !!V(id);
       state.rows = (j.r || []).filter(ok);
       state.cols = (j.c || []).filter(ok);
-      state.filters = (j.f || []).filter(f => ok(f.v)).map(f => ({ varId: f.v, mods: f.m }));
-      state.months = j.mo || null;
+      // indices de modalités bornés (le lien peut venir d'un pack régénéré)
+      state.filters = (j.f || []).filter(f => ok(f.v) && Array.isArray(f.m))
+        .map(f => ({ varId: f.v, mods: f.m.filter(mi => Number.isInteger(mi) && mi >= 0 && mi < V(f.v).mods.length) }))
+        .filter(f => f.mods.length);
+      const hm = pack.header.months || [];
+      state.months = Array.isArray(j.mo) ? j.mo.filter(ym => hm.includes(ym)) : null;
+      if (state.months && !state.months.length) state.months = null;
       if (j.o) {
         state.opts.weighted = !!j.o.w; state.opts.display = j.o.d || 'pcol'; state.opts.sig = j.o.s || 'total';
         state.opts.levels = j.o.l || [95, 99]; state.opts.mask = j.o.k != null ? j.o.k : 60;
@@ -221,8 +227,7 @@
     let matched = 'custom';
     if (!cur) matched = 'all';
     else { (h.presets || []).forEach((p, i) => { if (p.months.join(',') === cur) matched = 'p' + i; }); }
-    if (matched === 'custom' && cur) { addCustomOption(); }
-    sel.value = matched;
+    if (matched === 'custom' && cur) addCustomOption(); else sel.value = matched;
     sel.onchange = () => {
       if (sel.value === 'all') { state.months = null; refresh(); }
       else if (sel.value.startsWith('p')) { state.months = h.presets[+sel.value.slice(1)].months.slice(); refresh(); }
@@ -262,7 +267,9 @@
     modalOk = () => { const sels = [...list.querySelectorAll('input')].map((cb, i) => cb.checked ? i : -1).filter(i => i >= 0); closeModal(); onOk(sels); };
     modalCancel = () => { closeModal(); if (onCancel) onCancel(); };
     $('modal').hidden = false;
+    const first = list.querySelector('input'); if (first) first.focus();
   }
+  window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal').hidden) { e.preventDefault(); modalCancel && modalCancel(); } });
   function closeModal() { $('modal').hidden = true; }
   $('modalOk').onclick = () => modalOk && modalOk();
   $('modalCancel').onclick = () => modalCancel && modalCancel();
@@ -315,22 +322,34 @@
 
   function refresh() { renderChips(); markTreeButtons(); if (pack) recompute(); }
 
+  function syncExportButtons() {
+    const off = !lastRender;
+    $('btnExportXlsx').disabled = off; $('btnExportCsv').disabled = off; $('btnCopy').disabled = off;
+  }
+
   function recompute() {
     if (!pack) return;
     renderChips(); markTreeButtons();
     const st = $('status');
-    if (!state.rows.length) { st.innerHTML = 'Ajoutez au moins une variable en <strong>Lignes</strong> (bouton « L » dans le panneau des variables).'; $('table').textContent = ''; return; }
+    if (!state.rows.length) {
+      st.innerHTML = 'Ajoutez au moins une variable en <strong>Lignes</strong> (bouton « L » dans le panneau des variables).';
+      $('table').textContent = '';
+      lastResult = null; lastRender = null; syncExportButtons();
+      history.replaceState(null, '', hashState());
+      return;
+    }
     const t0 = performance.now();
     lastResult = TabEngine.compute(pack, currentSpec());
     const dt = performance.now() - t0;
     rerender(dt);
-    history.replaceState(null, '', hashState());
   }
 
   function rerender(computeMs) {
     if (!lastResult) return;
     lastRender = TabEngine.render(lastResult, state.opts);
     drawTable(lastRender);
+    syncExportButtons();
+    history.replaceState(null, '', hashState());
     const st = $('status');
     const o = state.opts;
     const notes = [];
@@ -351,7 +370,7 @@
     const thead = el('thead');
     // ligne 1 : groupes de colonnes
     const tr1 = el('tr');
-    const corner = el('th', 'rowhead', ''); corner.rowSpan = R.sig === 'pairs' ? 3 : 2; tr1.appendChild(corner);
+    const corner = el('th', 'rowhead', ''); corner.rowSpan = 2; tr1.appendChild(corner);
     let c = 0;
     while (c < NC) {
       let e = c;
@@ -362,16 +381,15 @@
       c = e + 1;
     }
     thead.appendChild(tr1);
-    // ligne 2 : libellés de colonnes
+    // ligne 2 : libellés de colonnes (+ lettre en mode tout contre tout)
     const tr2 = el('tr');
-    R.cols.forEach(col => { const th = el('th', null, col.label); th.title = (col.group ? col.group + ' — ' : '') + col.label; tr2.appendChild(th); });
+    R.cols.forEach(col => {
+      const th = el('th', null, col.label);
+      th.title = (col.group ? col.group + ' — ' : '') + col.label;
+      if (R.sig === 'pairs' && col.letter) th.appendChild(el('div', 'colletter', col.letter));
+      tr2.appendChild(th);
+    });
     thead.appendChild(tr2);
-    // ligne 3 : lettres (mode tout contre tout)
-    if (R.sig === 'pairs') {
-      const tr3 = el('tr');
-      R.cols.forEach(col => tr3.appendChild(el('th', null, col.letter || '')));
-      thead.appendChild(tr3);
-    }
     tbl.appendChild(thead);
 
     const tbody = el('tbody');
@@ -413,7 +431,7 @@
 
   // ------------------------------------------------------------ exports
   function exportName(ext) {
-    const d = new Date().toISOString().slice(0, 10);
+    const d = new Date().toLocaleDateString('fr-CA'); // AAAA-MM-JJ en heure locale
     return 'croiseur_' + d + '.' + ext;
   }
   function download(blob, name) {
@@ -423,6 +441,9 @@
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
 
+  // retire les séparateurs de milliers (espaces, fines insécables) des nombres,
+  // pour que Excel les reconnaisse au collage / import CSV
+  const unGroup = t => /^[\d\s  ]+$/.test(t) ? t.replace(/[\s  ]/g, '') : t;
   function tableToMatrix() { // pour CSV / presse-papiers (textes affichés)
     const R = lastRender; if (!R) return [];
     const out = [];
@@ -431,8 +452,8 @@
     if (R.sig === 'pairs') out.push([''].concat(R.cols.map(c => c.letter)));
     for (const B of R.blocks) {
       out.push([B.label].concat(Array(R.cols.length).fill('')));
-      for (const base of B.bases) out.push([base.label].concat(base.cells));
-      for (const row of B.rows) out.push(['  '.repeat(row.indent || 0) + row.label].concat(row.cells.map(c => c.text + (c.letters ? ' ' + c.letters : ''))));
+      for (const base of B.bases) out.push([base.label].concat(base.cells.map(unGroup)));
+      for (const row of B.rows) out.push(['  '.repeat(row.indent || 0) + row.label].concat(row.cells.map(c => unGroup(c.text) + (c.letters ? ' ' + c.letters : ''))));
     }
     return out;
   }
@@ -459,7 +480,8 @@
     excelJsReady = new Promise((res, rej) => {
       const s = document.createElement('script');
       s.src = 'vendor/exceljs.min.js';
-      s.onload = () => res(); s.onerror = () => rej(new Error('vendor/exceljs.min.js introuvable'));
+      s.onload = () => res();
+      s.onerror = () => { excelJsReady = null; s.remove(); rej(new Error('vendor/exceljs.min.js introuvable')); };
       document.head.appendChild(s);
     });
     return excelJsReady;
@@ -521,9 +543,9 @@
             const c = ws.getCell(r, 2 + i);
             c.alignment = { horizontal: 'center' };
             if (cell.masked) { c.value = '-'; c.font = { size: 9, color: { argb: 'FFBFBFBF' } }; return; }
-            if (cell.letters) { c.value = (cell.text || '') + '  ' + cell.letters; }
-            else if (cell.xv != null) { c.value = cell.xv; if (cell.xfmt) c.numFmt = cell.xfmt; }
+            if (cell.xv != null) { c.value = cell.xv; if (cell.xfmt) c.numFmt = cell.xfmt; }
             else c.value = cell.text;
+            if (cell.letters) c.note = 'Significativement supérieur aux colonnes : ' + cell.letters;
             let color = 'FF000000', bold = false;
             if (cell.sign > 0) color = GREEN; else if (cell.sign < 0) color = RED;
             if (cell.sign !== 0 && (R.levels.length === 1 || cell.level === R.levels[R.levels.length - 1])) bold = true;
@@ -547,6 +569,7 @@
       const rsp = await fetch('demo/demo.owx');
       if (!rsp.ok) throw new Error('demo introuvable');
       await loadPackFromBytes(await rsp.arrayBuffer(), 'demo.owx', true); // pas de mise en cache de la démo
+      $('cacheBanner').hidden = true; // le bandeau « restauré du cache » ne concerne plus la base affichée
     } catch (e) { alert('Démo indisponible : ' + e.message); }
   };
   $('btnSidebar').onclick = () => $('sidebar').classList.toggle('hidden');

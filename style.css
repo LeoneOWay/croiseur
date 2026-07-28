@@ -14,6 +14,8 @@
   font-size: 14px;
 }
 * { box-sizing: border-box; }
+/* l'attribut hidden doit gagner sur les display:flex déclarés plus bas */
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; color: var(--txt); background: var(--bg); display: flex; flex-direction: column; }
 
@@ -84,7 +86,7 @@ th, td { border-right: 1px solid #eef0f5; border-bottom: 1px solid #eef0f5; padd
 thead th { position: sticky; background: var(--hdr); color: #fff; font-weight: 600; z-index: 5; }
 thead tr:nth-child(1) th { top: 0; background: #eef2fa; color: var(--hdr); border-bottom: 1px solid var(--line); }
 thead tr:nth-child(2) th { top: 25px; max-width: 130px; white-space: normal; font-size: 11px; line-height: 1.2; vertical-align: middle; }
-thead tr:nth-child(3) th { top: auto; background: #dfe7f5; color: var(--hdr); font-size: 10.5px; padding: 1px 4px; }
+thead .colletter { font-size: 10px; font-weight: 700; color: #cfe0ff; margin-top: 2px; }
 thead th.rowhead { left: 0; z-index: 7; background: #eef2fa; color: var(--hdr); }
 tbody th.rlabel { position: sticky; left: 0; background: #fff; text-align: left; font-weight: 400; max-width: 380px; min-width: 240px; white-space: normal; z-index: 3; border-right: 1px solid var(--line); }
 tbody tr.blockhead th, tbody tr.blockhead td { background: #e4e9f4; font-weight: 700; color: var(--hdr); position: sticky; }
@@ -110,7 +112,6 @@ tr:hover td:not(.masked) { background: #fbfcff; }
 
 /* ---- panneau modal (filtres / mois) ---- */
 #modal { position: fixed; inset: 0; background: rgba(20,26,40,.35); display: flex; align-items: center; justify-content: center; z-index: 50; }
-#modal[hidden] { display: none; }
 #modal .box { background: #fff; border-radius: 10px; padding: 16px 18px; width: 440px; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
 #modal h3 { margin: 0 0 10px; font-size: 14px; color: var(--hdr); }
 #modalList { overflow-y: auto; flex: 1; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }

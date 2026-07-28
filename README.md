@@ -33,7 +33,12 @@ puis glissez votre fichier `.owx`, ou cliquez sur « Essayer la démo ».
   Excel, **lien de partage** qui restitue le tableau (la personne qui ouvre le
   lien doit disposer de la même base).
 - **Cache local** : la dernière base chargée est mémorisée dans le navigateur
-  (IndexedDB) et rechargée automatiquement à la prochaine visite.
+  (IndexedDB) et rechargée automatiquement à la prochaine visite (la démo,
+  elle, n'est jamais mise en cache).
+
+À l'ouverture d'une base, le **premier preset de période** du pack est
+sélectionné par défaut (l'effectif de l'univers est affiché sous les options) ;
+choisissez « Toute la période » pour l'ensemble de la base.
 
 ## Confidentialité
 
@@ -63,8 +68,10 @@ Le header JSON décrit les variables :
   "themes": ["…"],
   "vars": [{
     "id": "Q1", "code": "Q1. …", "label": "libellé long", "theme": "…",
+    "display": "Q1. SAT GLOBALE",    // facultatif : libellé court affiché en tête de bloc
     "kind": "question|lecture", "type": "single|multi|numeric|nps",
     "baseBit": 17,                    // bit « dans la base » (null = tout le monde)
+    "baseLabel": "Interrogés",        // facultatif : libellé de la ligne de base
     "mods": [{ "label": "…", "bit": 18, "indent": 1, "key": null }],
     "nps":  { "label": "NPS", "promoBit": 19, "neuBit": 20, "detBit": 21 },  // facultatif
     "mean": { "num": 0, "label": "Moyenne", "indent": 1 }                    // facultatif
@@ -75,9 +82,19 @@ Le header JSON décrit les variables :
 }
 ```
 
-Conventions : un bit de modalité n'est posé que si le répondant est dans la
-base du bloc (`baseBit`) ; les modalités peuvent se recouvrir (sous-totaux) ;
-les « % colonne » valent `Σw(modalité ∩ colonne) / Σw(base ∩ colonne)`.
+Conventions :
+- un bit de modalité n'est posé que si le répondant est dans la base du bloc
+  (`baseBit`) ; les modalités peuvent se recouvrir (sous-totaux « ST ») ;
+- les « % colonne » valent `Σw(modalité ∩ colonne) / Σw(base ∩ colonne)` ;
+- **NPS** : la ligne NPS retrouve les promoteurs / détracteurs via les mods
+  portant `key: "promo"` / `key: "det"` (à défaut, via `nps.promoBit` /
+  `nps.detBit`) — posez au moins l'un des deux ;
+- **période** : la variable `monthsVarId` doit avoir **exactement une modalité
+  par élément de `months`, dans le même ordre** (pas de sous-total ni de
+  modalité supplémentaire) — le filtre de période repose sur ces indices ;
+- sections en **little-endian** ; tout est décompressé en mémoire (compter
+  ~2× la taille décompressée au chargement — dimensionnez le pack en
+  conséquence, quelques centaines de Mo décompressés maximum).
 
 Pour générer un pack depuis vos données, écrivez un script qui pose ces bits et
 appelle `OWX.buildSync(header, {weights, bits, nums})` (voir

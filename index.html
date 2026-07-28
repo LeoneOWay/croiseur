@@ -80,7 +80,7 @@
     <section id="options" hidden>
       <div class="opt"><label class="optname">Chiffres</label>
         <span class="seg" id="segWeight">
-          <button data-v="w" class="on" title="% et bases pondérés par le poids de redressement">Redressés</button>
+          <button data-v="w" class="on" title="%, moyennes et effectifs pondérés par le poids de redressement (la base « Interrogés » reste l'effectif brut)">Redressés</button>
           <button data-v="raw" title="Effectifs et % bruts, sans pondération">Bruts</button>
         </span>
       </div>
@@ -122,7 +122,7 @@
   </main>
 </div>
 
-<div id="modal" hidden>
+<div id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle">
   <div class="box">
     <h3 id="modalTitle"></h3>
     <div id="modalList"></div>
@@ -139,7 +139,7 @@
   </div>
 </div>
 
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script src="js/owx.js"></script>
 <script src="js/tabengine.js"></script>

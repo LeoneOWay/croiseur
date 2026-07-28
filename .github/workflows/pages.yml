@@ -18,6 +18,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: Garde-fou — vérifier qu'aucune donnée réelle n'est publiée
+        run: |
+          test "$(find . -name '*.owx' -not -path './demo/demo.owx' | wc -l)" -eq 0 || { echo 'Fichier .owx inattendu dans le dépôt'; exit 1; }
+          node -e "const z=require('zlib'),fs=require('fs');const b=z.gunzipSync(fs.readFileSync('demo/demo.owx'));const h=JSON.parse(b.subarray(12,12+b.readUInt32LE(8)).toString('utf8'));if(!/fictives|démonstration/i.test(h.title+h.subtitle)||h.n>20000){console.error('demo.owx suspect :',h.title,'n='+h.n);process.exit(1)};console.log('demo OK :',h.title,'n='+h.n)"
       - uses: actions/configure-pages@v5
         with:
           enablement: true

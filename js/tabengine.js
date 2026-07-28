@@ -62,8 +62,12 @@
     for (const f of (spec.filters || [])) {
       const v = varById(h, f.varId);
       if (!v || !f.mods || !f.mods.length) continue;
-      if (f.mods.length >= v.mods.length) continue; // toutes modalités cochées = pas de filtre
-      fgroups.push(f.mods.map(mi => bp(v.mods[mi].bit)));
+      // indices dédupliqués et bornés (liens de partage / packs régénérés) ;
+      // « toutes modalités cochées » reste un vrai filtre (les variables ne sont
+      // pas forcément exhaustives : multi-réponses, univers restreints…)
+      const mset = [...new Set(f.mods)].filter(mi => Number.isInteger(mi) && mi >= 0 && mi < v.mods.length);
+      if (!mset.length) continue;
+      fgroups.push(mset.map(mi => bp(v.mods[mi].bit)));
     }
 
     // colonnes : Total + modalités de chaque variable de colonne
@@ -94,7 +98,11 @@
       if (v.mean) B.rows.push({ kind: 'mean', num: v.mean.num, label: v.mean.label || 'Moyenne', indent: v.mean.indent == null ? 1 : v.mean.indent,
         sx: new Float64Array(NC), sxx: new Float64Array(NC), swx: new Float64Array(NC), swxx: new Float64Array(NC) });
       const npsRow = B.rows.find(r => r.kind === 'nps');
-      if (npsRow) { npsRow.promoRow = B.rows.find(r => r.key === 'promo') || null; npsRow.detRow = B.rows.find(r => r.key === 'det') || null; }
+      if (npsRow) { // repérage par clé, sinon par bit (nps.promoBit/detBit)
+        const byBit = bit => bit == null ? null : (B.rows.find(r => r.kind === 'pct' && r.byte === (bit >> 3) && r.mask === (1 << (bit & 7))) || null);
+        npsRow.promoRow = B.rows.find(r => r.key === 'promo') || byBit(v.nps.promoBit);
+        npsRow.detRow = B.rows.find(r => r.key === 'det') || byBit(v.nps.detBit);
+      }
       return B;
     }).filter(Boolean);
 
@@ -213,8 +221,8 @@
     for (const B of result.blocks) {
       const blkOut = { varId: B.varId, v: B.v, label: B.v.display || B.v.label, longLabel: B.v.label, theme: B.v.theme, type: B.v.type, rows: [], bases: [] };
       // lignes de base
-      blkOut.bases.push({ label: B.v.kind === 'question' ? 'Interrogés' : 'Ensemble (interrogés)', cells: Array.from({ length: NC }, (_, c) => B.baseN[c] > 0 ? fmtInt(B.baseN[c]) : '') });
-      if (opts.showWeightedBase) blkOut.bases.push({ label: 'Base redressée', cells: Array.from({ length: NC }, (_, c) => B.baseW[c] > 0 ? fmtInt(B.baseW[c]) : '') });
+      blkOut.bases.push({ label: B.v.baseLabel || (B.v.kind === 'question' ? 'Interrogés' : 'Ensemble (interrogés)'), cells: Array.from({ length: NC }, (_, c) => B.baseN[c] > 0 ? fmtInt(B.baseN[c]) : '') });
+      if (opts.showWBase) blkOut.bases.push({ label: 'Base redressée', cells: Array.from({ length: NC }, (_, c) => B.baseW[c] > 0 ? fmtInt(B.baseW[c]) : '') });
       if (opts.showEffBase) blkOut.bases.push({ label: 'Base effective (Kish)', cells: Array.from({ length: NC }, (_, c) => B.baseW2[c] > 0 ? fmtInt(kish(B.baseW[c], B.baseW2[c])) : '') });
 
       for (const row of B.rows) {

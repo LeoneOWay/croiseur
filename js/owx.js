@@ -31,20 +31,31 @@
   }
 
   function parseBuffer(u8) {
+    // copie indépendante et alignée d'une section (les .slice de Buffer Node
+    // sont des VUES partagées : il faut recopier pour garantir offset 0)
+    const copy = (start, end) => { const s = u8.subarray(start, end); const out = new Uint8Array(s.length); out.set(s); return out; };
+    if (new Uint8Array(new Uint16Array([1]).buffer)[0] !== 1) throw new Error('Plateforme big-endian non supportée (format .owx little-endian)');
+    if (u8.length < 12) throw new Error('Fichier .owx invalide (trop court)');
     let magic = '';
     for (let i = 0; i < 8; i++) magic += String.fromCharCode(u8[i]);
     if (magic !== MAGIC) throw new Error('Fichier .owx invalide (signature absente)');
     const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
     const hlen = dv.getUint32(8, true);
-    const header = JSON.parse(new TextDecoder('utf-8').decode(u8.subarray(12, 12 + hlen)));
+    if (12 + hlen > u8.length) throw new Error('Fichier .owx tronqué (en-tête incomplet)');
+    let header;
+    try { header = JSON.parse(new TextDecoder('utf-8').decode(u8.subarray(12, 12 + hlen))); }
+    catch (e) { throw new Error('En-tête .owx illisible : ' + e.message); }
+    if (header.format !== 'owx1' || !Number.isInteger(header.n) || header.n < 0 || !header.layout || !(header.layout.bytesPerRow >= 1) || !Array.isArray(header.vars)) {
+      throw new Error('En-tête .owx incomplet (format/n/layout/vars)');
+    }
     const n = header.n, L = header.layout;
     let off = 12 + hlen;
     const need = n * 8 + n * L.bytesPerRow + n * 4 * (L.numCount || 0);
     if (u8.length - off < need) throw new Error('Fichier .owx tronqué (' + (u8.length - off) + ' octets de données, ' + need + ' attendus)');
-    const wBytes = u8.slice(off, off + n * 8); off += n * 8;
-    const bits = u8.slice(off, off + n * L.bytesPerRow); off += n * L.bytesPerRow;
+    const wBytes = copy(off, off + n * 8); off += n * 8;
+    const bits = copy(off, off + n * L.bytesPerRow); off += n * L.bytesPerRow;
     let nums = new Float32Array(0);
-    if (L.numCount) { const xb = u8.slice(off, off + n * 4 * L.numCount); nums = new Float32Array(xb.buffer, 0, n * L.numCount); }
+    if (L.numCount) { const xb = copy(off, off + n * 4 * L.numCount); nums = new Float32Array(xb.buffer, 0, n * L.numCount); }
     return { header, weights: new Float64Array(wBytes.buffer, 0, n), bits, nums };
   }
 
