@@ -1,0 +1,5 @@
+# Jamais de données réelles dans le dépôt — seule la démo synthétique est versionnée
+*.owx
+!demo/demo.owx
+node_modules/
+Thumbs.db

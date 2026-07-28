@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Croiseur OW — tris croisés en ligne</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f3864'/%3E%3Cpath d='M3 6h10M3 10h10M6 3v10M10 3v10' stroke='white' stroke-width='1.4'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">⊞ Croiseur <small>OpinionWay</small></div>
+  <div id="packinfo">
+    <strong id="packTitle">Aucune base chargée</strong>
+    <span id="packSub"></span>
+  </div>
+  <div class="actions">
+    <button id="btnSidebar" title="Afficher / masquer le panneau des variables">☰ Variables</button>
+    <button id="btnLoad" title="Charger un fichier de base .owx">Charger une base…</button>
+    <button id="btnExportXlsx" disabled title="Exporter le tableau au format Excel">Excel</button>
+    <button id="btnExportCsv" disabled title="Exporter le tableau en CSV">CSV</button>
+    <button id="btnCopy" disabled title="Copier le tableau (collable dans Excel)">Copier</button>
+    <button id="btnShare" disabled title="Copier un lien qui restitue ce tableau (nécessite la même base)">Lien</button>
+  </div>
+  <input type="file" id="fileInput" accept=".owx" hidden>
+</header>
+
+<div id="cacheBanner" class="banner" hidden>
+  <span id="cacheMsg"></span>
+  <button id="btnCacheClear">Vider le cache</button>
+</div>
+
+<div id="layout">
+  <aside id="sidebar" class="hidden">
+    <input id="varSearch" type="search" placeholder="Rechercher une variable…">
+    <div id="varTree"></div>
+  </aside>
+
+  <main id="main">
+    <div id="dropzone">
+      <div class="inner" id="dropInner">
+        <h2>Croiseur OW</h2>
+        <p>Croisez n'importe quelles variables d'une base d'enquête : tris croisés
+        <strong>bruts ou redressés</strong>, significativités <strong>vs&nbsp;Total,
+        tout contre tout ou vs&nbsp;complément</strong> (90&nbsp;/&nbsp;95&nbsp;/&nbsp;99&nbsp;%),
+        masquage des petites bases, export Excel.</p>
+        <p>Chargez un fichier de base <code>.owx</code> (généré par le script de préparation)
+        ou explorez la démo.</p>
+        <div class="actions">
+          <button id="btnLoad2" class="primary">Charger une base (.owx)…</button>
+          <button id="btnDemo">Essayer la démo</button>
+        </div>
+        <p class="privacy">🔒 Vos données ne quittent jamais votre navigateur : le fichier est lu et
+        calculé localement, aucune donnée n'est envoyée sur Internet. La base peut être mémorisée
+        dans le cache local du navigateur pour les prochaines visites.</p>
+      </div>
+    </div>
+
+    <section id="config" hidden>
+      <div class="zone">
+        <h3>Lignes <span class="hint">— variables analysées</span></h3>
+        <div class="chips" id="chipsRows"></div>
+      </div>
+      <div class="zone">
+        <h3>Colonnes <span class="hint">— bannière</span></h3>
+        <div class="chips" id="chipsCols"></div>
+      </div>
+      <div class="zone">
+        <h3>Filtres <span class="hint">— univers</span></h3>
+        <div class="chips" id="chipsFilters"></div>
+      </div>
+      <div class="zone" id="zonePeriod">
+        <h3>Période</h3>
+        <select id="periodSel"></select>
+      </div>
+    </section>
+
+    <section id="options" hidden>
+      <div class="opt"><label class="optname">Chiffres</label>
+        <span class="seg" id="segWeight">
+          <button data-v="w" class="on" title="% et bases pondérés par le poids de redressement">Redressés</button>
+          <button data-v="raw" title="Effectifs et % bruts, sans pondération">Bruts</button>
+        </span>
+      </div>
+      <div class="opt"><label class="optname">Affichage</label>
+        <span class="seg" id="segDisplay">
+          <button data-v="pcol" class="on" title="Pourcentages en colonne">% colonne</button>
+          <button data-v="prow" title="Pourcentages en ligne">% ligne</button>
+          <button data-v="count" title="Effectifs">Effectifs</button>
+        </span>
+      </div>
+      <div class="opt"><label class="optname">Significativité</label>
+        <span class="seg" id="segSig">
+          <button data-v="none" title="Pas de test">Aucune</button>
+          <button data-v="total" class="on" title="Chaque colonne comparée à la colonne Total (vert = supérieur, rouge = inférieur)">vs Total</button>
+          <button data-v="pairs" title="Toutes les colonnes d'une même variable comparées deux à deux (lettres)">Tout contre tout</button>
+          <button data-v="comp" title="Chaque colonne comparée au reste de l'échantillon (complément)">vs Complément</button>
+        </span>
+      </div>
+      <div class="opt"><label class="optname">Seuils</label>
+        <select id="selLevels">
+          <option value="95,99" selected>95 % + 99 %</option>
+          <option value="95">95 %</option>
+          <option value="99">99 %</option>
+          <option value="90,95">90 % + 95 %</option>
+          <option value="90">90 %</option>
+        </select>
+      </div>
+      <div class="opt"><label class="optname">Masquer si base &lt;</label>
+        <input type="number" id="inpMask" value="60" min="0" step="10">
+      </div>
+      <div class="opt">
+        <label><input type="checkbox" id="chkWBase"> Base redressée</label>
+        <label><input type="checkbox" id="chkEffBase"> Base effective</label>
+      </div>
+    </section>
+
+    <section id="status" hidden></section>
+    <div id="tablewrap" hidden><table id="table"></table></div>
+  </main>
+</div>
+
+<div id="modal" hidden>
+  <div class="box">
+    <h3 id="modalTitle"></h3>
+    <div id="modalList"></div>
+    <div class="foot">
+      <span>
+        <button id="modalAll">Tout</button>
+        <button id="modalNone">Aucun</button>
+      </span>
+      <span class="right">
+        <button id="modalCancel">Annuler</button>
+        <button id="modalOk" class="primary">Appliquer</button>
+      </span>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="js/owx.js"></script>
+<script src="js/tabengine.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
